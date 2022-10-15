@@ -73,17 +73,45 @@
     1. execute ZIO effect
 * `trait ZSink[-Env, +Err, -In, +Leftover, +Summary]`
     * describe ways of consuming elements
+    * how to create?
+        ```
+        ZSink.fromFileName("README2.md")
+        ```
     * example
         ```
         def run[R1 <: R, E1 >: E, B](sink: ZSink[R1, E1, A, Any, B]): ZIO[R1, E1, B]
 
-
+        .run(ZSink.collectAll)
         ```
     * combining sinks
         ```
         outputSink1.zipPar(outputSink2) // send inputs to both
         ```
+    * mental model
+        ```
+        trait ZSink[-Env, +Err, -In, +Leftover, +Summary] {
+            def push: ZIO[Env with Scope, Nothing, Option[In] => ZIO[
+                Any,
+                (Either[Err, Summary], Leftover),
+                Unit]]
+        }
+        ```
+        * Unit = need more input
+        * fail with (Summary, Leftover) = done
+            * Leftover = some sinks may not consume all of their inputs
+                * example
+                    ```
+                    val sink: ZSink[Any, Nothing, Int, Int, Chunk[Int]] = ZSink.collectAllN(3)
+
+                    stream.transduce(sink).runCollect
+                    ```
+        * Option[In] = state of stream the sink is consuming from
+            * Some = producing
+            * None = done
 * `trait ZPipeline[-Env, +Err, -In, +Out]`
+    * represents the "middle" of the stream
+    * conceptually: stream transformation function
+    * most useful applications of pipelines is for encoders and decoders
     * how to create?
         ```
         object ZPipeline {
