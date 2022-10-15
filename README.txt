@@ -5,10 +5,7 @@
 * references
     * https://www.zionomicon.com
     * https://zio.dev/version-1.x/datatypes/stream/zstream/
-    * [Zymposium - ZIO Streams Part 1 (The Channel Type)](https://www.youtube.com/watch?v=8hG_UY0Dazw)
-    * [Zymposium - ZIO Streams Part 2 (Using Channels)](https://www.youtube.com/watch?v=Pfu8m3XBBuQ)
     * [Zymposium - ZIO Streams Part 3 (Streaming Sandwiches)](https://www.youtube.com/watch?v=SGr7mQ15-Pw)
-    * [Zymposium - ZIO Streams - Final Part (Fan In/Fan Out)](https://www.youtube.com/watch?v=3EO0yVf63xI)
     * [ZIO Stream — Part 2 — Sinks!](https://www.youtube.com/watch?v=T5vBs6_W_Xg)
     * https://blog.rockthejvm.com/zio-streams/
     * [ZIO-streams tutorial - build a Bitcoin ticker in 10 minutes](https://www.youtube.com/watch?v=sXYceYCLUZw)
