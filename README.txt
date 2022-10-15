@@ -23,60 +23,24 @@
         * replace fs2 with Zstream
 
 ## zstream
-
-* ZIO vs ZStream
-    * ZIO - single value
-* conceptually
-    * ZStream is a ZIO effect that can be evaluated repeatedly
-    * effectual iterator
-    * collection of potentially infinitely many elements
-* under the hood
-    * implicit chunking
-        ```
-        trait ZStream[-R, +E, +O] {
-            def process: ZIO[R with Scope, Option[E], Chunk[O]] // motivation: efficiency
-        }
-        ```
-        however, filter and map work on individual O values
-* useful functions
-    * collect = map + filter
-    * concat - switch to other stream after this stream is done
-    * mapAccum - map with stateful function
-        ```
-        def mapAccum[S, A1](s: => S)(f: (S, A) => (S, A1))
-        ```
-    * unfold
-        * declaration
-            ```
-            def unfold[S, A](s: S)(f: S => Option[(A, S)]): ZStream[Any, Nothing, A]
-            ```
-        * is only evaluated as values are pulled
-            * can be used to describe streams that continue forever
-        * effectual variant: unfoldZIO
-            * example: reading incrementally from a data source while maintaining some cursor
-* many operators have effectual variants (ZIO suffix)
-    * for effectual variants - many have parallel variants (Par suffix)
-    * example: map, mapZIO, mapZIOPar
-* running stream steps
-    1. transform ZStream to a ZIO effect
-        * ZStream produces potentially infinitely many values
-            * how to run a stream to produce a single value (ZIO effect)?
-                * run stream and discard results (runDrain)
-                * return the first value (runHead)
-                * fold to produce summary, consume only as many elements as necessary to produce summary
-            * example
-                * get tweets -> transform -> save to db
-                * entire program described as a stream
-                    * no need for any result, just run it
-    1. execute ZIO effect
 * components
-    * ZStream[R, E, O], an effectual stream
+    * `ZStream[R, E, O]`
+        * effectual stream
         * requires an environment R
         * may fail with an error E
             * if a stream fails with an error it is not well defined to pull from that stream again
         * succeed with zero or more values of type O
         * pull-based
-            * elements are processed by being “pulled through the stream” by the sink
+            * elements are processed by being "pulled through the stream" by the sink
+        * ZIO vs ZStream
+            * ZIO - single value
+        * we can rewrite any chained ZStream as ZPipelines + ZSink
+            * example
+                ```
+                stream >>> pipeline1 >>> pipeline2 >>> sink
+                ```
+            * motivation
+                * very complex cases: good to have transformation/consumption as data types
     * `trait ZSink[-Env, +Err, -In, +Leftover, +Summary]`
         * describe ways of consuming elements
         * how to create?
@@ -153,10 +117,85 @@
                   val sum: ZIO[Any, Nothing, Int] =
                     ZStream("1", "2", "3", "4", "5").map(_.toInt).run(numericSum) // done on the stream side (map)
                 ```
-* we can rewrite any chained ZStream as ZPipelines + ZSink
+    * trait `ZChannel[-Env, -InErr, -InElem, -InDone, +OutErr, +OutElem, +OutDone]`
+        * unifies streams, sinks, and pipelines
+        * `type ZStream[-R, +E, +A] = ZChannel[R, Any, Any, Any, E, Chunk[A], Any]`
+            * Any = does not need / does not produce
+        * `type ZSink[-R, +E, -In, +L, +Z] = ZChannel[R, Nothing, Chunk[In], Any, E, L, Z]`
+            * sink itself doesn’t know how to handle any errors so the error type has to be Nothing
+        * `type ZPipeline[-R, +E, -In, +Out] = ZChannel[R, Nothing, Chunk[In], Any, E, Chunk[Out], Any]`
+        * `type ZIO[-R, +E, +A] = ZChannel[R, Any, Any, Any, E, Nothing, A]`
+* under the hood
+    * implicit chunking
+        ```
+        trait ZStream[-R, +E, +O] {
+            def process: ZIO[R with Scope, Option[E], Chunk[O]] // motivation: efficiency
+        }
+        ```
+        however, filter and map work on individual values
+* useful operators
+    * collect = map + filter
+    * concat - switch to other stream after this stream is done
+    * mapAccum - map with stateful function
+        ```
+        def mapAccum[S, A1](s: => S)(f: (S, A) => (S, A1))
+        ```
+    * unfold
+        * declaration
+            ```
+            def unfold[S, A](s: S)(f: S => Option[(A, S)]): ZStream[Any, Nothing, A]
+            ```
+        * is only evaluated as values are pulled
+            * can be used to describe streams that continue forever
+        * effectual variant: unfoldZIO
+            * example: reading incrementally from a data source while maintaining some cursor
+    * many operators have effectual variants (ZIO suffix)
+        * for effectual variants - many have parallel variants (Par suffix)
+        * example: map, mapZIO, mapZIOPar
+* running stream
+    1. transform ZStream to a ZIO effect
+        * ZStream produces potentially infinitely many values
+            * how to run a stream to produce a single value (ZIO effect)?
+                * run stream and discard results (runDrain)
+                * return the first value (runHead)
+                * fold to produce summary, consume only as many elements as necessary to produce summary
+            * example
+                * get tweets -> transform -> save to db
+                * entire program described as a stream
+                    * no need for any result, just run it
+    1. execute ZIO effect
+* scope
+    * ZIO workflow never produces any incremental output
+        * it is clear that the finalizer should be run immediately after ZIO completes execution
+    * general rule: finalizer should be run immediately after stream completes execution
+        * we don’t want to run finalizers associated with an upstream channel while a downstream channel
+        is still processing elements
     * example
         ```
-        stream >>> pipeline1 >>> pipeline2 >>> sink
+          val finalizer: URIO[Any, Unit] = Console.printLine("finalizer finished").orDie
+          def logging(prefix: String): Any => URIO[Any, Unit] = v => Console.printLine(s"$prefix " + v).orDie
+          val businessLogic: Int => UStream[Int] = (v: Int) =>
+            ZStream.fromZIO(Console.printLine(s"flatMap $v").orDie) *> ZStream.succeed(v)
+          val stream1 = ZStream(1, 2, 3, 4)
+          val stream2 = ZStream(5, 6, 7, 8)
+
+          val ex1 = stream1
+            .ensuring(finalizer)
+            .tap(logging("first tapping"))
+            .flatMap(businessLogic)
+            .concat(stream2)
+            .tap(logging("second tapping"))
+            .runDrain
         ```
-    * motivation
-        * very complex cases: good to have transformation/consumption as data types
+        results:
+        ```
+        first tapping 1
+        flatMap 1
+        second tapping 1
+        ...
+        second tapping 4
+        finalizer finished
+        second tapping 5
+        ...
+        second tapping 8
+        ```
