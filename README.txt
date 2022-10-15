@@ -11,6 +11,7 @@
     * [Zymposium - ZIO Streams - Final Part (Fan In/Fan Out)](https://www.youtube.com/watch?v=3EO0yVf63xI)
     * [ZIO Stream — Part 2 — Sinks!](https://www.youtube.com/watch?v=T5vBs6_W_Xg)
     * https://blog.rockthejvm.com/zio-streams/
+    * [ZIO-streams tutorial - build a Bitcoin ticker in 10 minutes](https://www.youtube.com/watch?v=sXYceYCLUZw)
 
 ## preface
 * goals of this workshop
@@ -19,8 +20,38 @@
         * Sink
         * Pipeline
 * workshop task
-    * base repo: https://github.com/mtumilowicz/scala-zio2-fs2-refined-newtype-workshop
-        * replace fs2 with Zstream
+    * task1: migration from fs2 to ZStream
+        * base repo: https://github.com/mtumilowicz/scala-zio2-fs2-refined-newtype-workshop
+            * replace fs2 with ZStream
+    * task2: get BTC-EUR price every 5 seconds (answer: BitcoinTicker object)
+        ```
+        import zio.stream.ZStream
+        import zio.{Scope, ZIO, ZIOAppArgs, ZIOAppDefault, durationInt}
+
+        import scala.io.Source
+
+        object BitcoinTicker extends ZIOAppDefault {
+          val url = "https://api.kraken.com/0/public/Ticker?pair=BTCEUR"
+
+          val getPrice = ZIO.fromAutoCloseable(ZIO.attempt(Source.fromURL(url)))
+            .map(_.mkString)
+            .map(extractPrice)
+
+          def extractPrice(json: String): BigDecimal =
+            BigDecimal.apply(
+              """c":\["([0-9.]+)"""
+                .r("priceGroup")
+                .findAllIn(json)
+                .group("priceGroup")
+            )
+
+          override def run: ZIO[Any with ZIOAppArgs with Scope, Any, Any] =
+            ZStream
+              // constantly call getPrice, hint: repeatZIO
+              // every 5 seconds, hint: throttleShape
+              // println price, hint: foreach, s"BTC-EUR: ${price.setScale(2)}"
+        }
+        ```
 
 ## zstream
 * components
