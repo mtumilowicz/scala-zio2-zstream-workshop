@@ -1,11 +1,9 @@
 package product
 
 import zio.stream.{UStream, ZChannel, ZPipeline, ZStream}
-import zio.{Chunk, ChunkBuilder, UIO, ZIO, ZNothing}
+import zio.{Chunk, ChunkBuilder, ZIO, ZNothing}
 
 object ProductService {
-
-  def buy(product: Product): UIO[Unit] = ZIO.debug(s"Product ${product.toString} bought!")
 
   val encodedProducts: UStream[Char] = ZStream.fromChunk(
     Chunk.fromIterable("Computer" + "WashingMachine" + "TV" + "TV")
