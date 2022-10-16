@@ -49,7 +49,34 @@
               // println price, hint: foreach, s"BTC-EUR: ${price.setScale(2)}"
         }
         ```
+    * task3: implement decoding `ZChannel`
+        * input: concatenated products char by char
+            * `ProductService.encodedProducts.runCollect.flatMap(zio.Console.printLine(_))`
+            * `Chunk(C,o,m,p,u,t,e,r,W,a,s,h,i,n,g,M,a,c,h,i,n,e,T,V,T,V)`
+        * output: parsed products
+            * `ProductService.products.runCollect.flatMap(zio.Console.printLine(_))`
+            * `Chunk(Computer,WashingMachine,TV,TV)`
+        * method to implement
+            ```
+              val decodeProduct: ZPipeline[Any, Nothing, Char, Product] = {
+                // read some input
+                // decode as many products as we can, maybe some leftovers appear
+                // emit decoded products
+                // read more input and add it to the leftovers
+                // repeat
+                def read(buffer: Chunk[Char]): ZChannel[Any, ZNothing, Chunk[Char], Any, Nothing, Chunk[Product], Any] = {
+                  // read from input, hint: ZChannel.readWith
+                  // use process buffer, hint: (leftovers, products)
+                  // write to channel, hint: ZChannel.writeAll
+                  // repeat with leftovers, hint: read(leftovers)
+                  // handle error channel, hint: ZNothing, ZChannel.fail
+                  // handle done, hint: if buffer not empty - ZIO.debug error, otherwise ZChannel.succeed
+                }
 
+                ZPipeline.fromChannel(read(Chunk.empty))
+              }
+            ```
+        * solution: `ProductService`
 ## zstream
 * components
     * `ZStream[R, E, O]`
