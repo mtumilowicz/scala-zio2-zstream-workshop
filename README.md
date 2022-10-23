@@ -10,6 +10,8 @@
     * [ZIO Stream — Part 2 — Sinks!](https://www.youtube.com/watch?v=T5vBs6_W_Xg)
     * https://blog.rockthejvm.com/zio-streams/
     * [ZIO-streams tutorial - build a Bitcoin ticker in 10 minutes](https://www.youtube.com/watch?v=sXYceYCLUZw)
+    * https://j3t.ch/tech/zio-streams-trappings/
+    * https://github.com/adamgfraser/0-to-100-with-zio-test
 
 ## preface
 * goals of this workshop
@@ -78,6 +80,13 @@
               }
             ```
         * solution: `ProductService`
+    * task5
+        * read from `src/test/resources/contributors/data.txt` and group contributors by repository
+            * solution: `ContributorService`
+        * you could verify number of lines using:
+            ```
+            cat ~/IdeaProjects/scala-zio2-zstream-workshop/src/test/resources/contributors/data.txt | awk -F, '{ print $1 }' | sort -u | wc -l
+            ```
 ## zstream
 * components
     * `ZStream[R, E, O]`
@@ -205,9 +214,26 @@
             * can be used to describe streams that continue forever
         * effectual variant: unfoldZIO
             * example: reading incrementally from a data source while maintaining some cursor
+    * groupByKey
+        * example
+            ```
+            stream.groupByKey(_.key) { case (key, stream) => operations on stream}
+            ```
+        * function will helpfully push entries with the same key to their own sub-stream
+            * reason: are potentially infinite
+        * `apply` function of groupBy/groupByKey: 
+            * already using flatMapPar under the hood
     * many operators have effectual variants (ZIO suffix)
         * for effectual variants - many have parallel variants (Par suffix)
         * example: map, mapZIO, mapZIOPar
+        * digression
+            * problem: enters your 100mb/sec production stream of ~200'000 messages each second, and suddenly your app 
+              can’t keep up even though its CPU usage seems desperately low.
+            * reason: absence of parallelism
+                * if you’ve expressed your logic using .map or .flatMap only on your stream, well, that particular 
+                  stage of your processing pipeline is guaranteed to be run on a single fiber
+            * solution: replace the mapM/flatMap that where applying the business logic to the stream with 
+              mapMPar (or some variants)
 * running stream
     1. transform ZStream to a ZIO effect
         * ZStream produces potentially infinitely many values
