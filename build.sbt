@@ -13,4 +13,6 @@ libraryDependencies += "dev.zio" %% "zio-test" % "2.0.2" % "test"
 libraryDependencies += "org.scalatest" %% "scalatest" % "3.1.2" % "test"
 libraryDependencies += "org.scalacheck" %% "scalacheck" % "1.14.1" % "test"
 
+testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework")
+
 scalacOptions += "-Ymacro-annotations"
