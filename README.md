@@ -97,34 +97,24 @@
         * succeed with zero or more values of type O
         * pull-based
             * elements are processed by being "pulled through the stream" by the sink
-        * ZIO vs ZStream
-            * ZIO - single value
-        * we can rewrite any chained ZStream as ZPipelines + ZSink
-            * example
-                ```
-                stream >>> pipeline1 >>> pipeline2 >>> sink
-                ```
-            * motivation
-                * very complex cases: good to have transformation/consumption as data types
+        * vs ZIO: ZIO - single value
     * `trait ZSink[-Env, +Err, -In, +Leftover, +Summary]`
         * describe ways of consuming elements
-            * composable aggregation strategy
-        * represents a strategy for aggregating zero or more elements into a summary value
+        * composable aggregation strategy
+        * strategy for aggregating zero or more elements into a summary value
         * sink may emit zero or more leftover values of type `Chunk[+Leftover]`
-            * these represent inputs that were received by the sink but were not included in the aggregation
+            * represents inputs that were received but not included in the aggregation
+                * in some cases it can be useful to keep leftovers for further processing
             * chunking can lead to leftovers
-                * sink does not need to all of the elements in the chunk to produce a summary value
+                * sink does not need all of the elements in the chunk to produce a summary value
                 * example
-                    * suppose that we want to have 3 elements, but results are produced with two elements chunks
-            * can also arise even without chunking
-                * example
-                    ```
-                    ZSink.collectAllWhile(_ == "a")
-                    ```
-                    * suppose inputs like "a" then "b"
-                        * "b" is leftover because we have to consume it to decide if the sink is done
-            * why they are not simply dropped?
-                * maybe in some cases it can be useful to keep leftovers for further processing
+                    * suppose that we want to have 3 elements, but results are produced with 2 x two-element chunks
+            * example
+                ```
+                ZSink.collectAllWhile(_ == "a")
+                ```
+                * suppose inputs: "a" then "b"
+                    * "b" is leftover because we have to consume it to decide if the sink is done
         * how to create?
             ```
             ZSink.fromFileName("README2.md")
@@ -140,8 +130,7 @@
             outputSink1.zipPar(outputSink2) // send inputs to both
             ```
         * asynchronous aggregations
-            * we would like to specify both a number of records we would like to aggregate and a maximum
-            duration we are willing to wait to aggregate them
+            * size of a chunk + duration (to not wait eternally for filling chunk)
             * example
                 ```
                 def aggregateAsyncWithin[R1 <: R, E1 >: E, A1 >: A, B](
@@ -149,40 +138,23 @@
                     schedule: => Schedule[R1, Option[B], Any]
                     )
                 ```
-                * if the sink is done first then the aggregated value will be emitted downstream
+                * if the sink is done first => aggregated value will be emitted downstream
                     * previous schedule timeout will be canceled
-                    * process will be repeated with the sink being run again and the next recurrence of the schedule
-                * if the schedule is done first then we write a done value to sink
+                    * then run the sink again and the next recurrence of the schedule
+                * if the schedule is done first => write a done value to sink
                     * writes its aggregated value to the downstream immediately
                     * then run the sink again and the next recurrence of the schedule
-        * mental model
-            ```
-            trait ZSink[-Env, +Err, -In, +Leftover, +Summary] {
-                def push: ZIO[Env with Scope, Nothing, Option[In] => ZIO[
-                    Any,
-                    (Either[Err, Summary], Leftover),
-                    Unit]]
-            }
-            ```
-            * Unit = need more input
-            * fail with (Summary, Leftover) = done
-                * Leftover = some sinks may not consume all of their inputs
-                    * we cannot discard them as some other sink may want them
-            * Option[In] = state of stream the sink is consuming from
-                * Some = producing
-                * None = done
     * `trait ZPipeline[-Env, +Err, -In, +Out]`
         * represents the "middle" of the stream
             * streams: beginning of a data flow process
             * sinks: end of a data flow process
-            * result of combining a pipeline with a sink is a new sink, just like the result of combining a pipeline with a stream is a new stream
-        * takes as input a stream and returns a new stream with a different element type
-            * definition of a pipeline is extremely broad
+        * takes as input a stream and returns a new stream of different element type
+            * definition is extremely broad
                 * almost any stream operator can be described as a pipeline
-            * can: map, filter, aggregate, append, etc
-            * can't: provide environment or handle stream errors
-        * conceptually: similar to sink - pipeline is a strategy for describing transformations, not error handling
-        * most useful applications of pipelines is for encoders and decoders
+                * can: map, filter, aggregate, append, etc
+                * can't: provide environment or handle stream errors
+        * strategy for describing transformations, not error handling
+        * use case: encoders and decoders
             * encoding or decoding should be completely independent of the logic of a particular stream
         * how to create?
             ```
@@ -245,6 +217,7 @@
             * the reason why we can hook sink with pipeline
                 * if a pipeline was just a function we would have very limited ability to compose it with other
                 streaming data types
+            * result of combining a pipeline with a sink/stream is a new sink/stream
         * `type ZIO[-R, +E, +A] = ZChannel[R, Any, Any, Any, E, Nothing, A]`
 * under the hood
     * implicit chunking
