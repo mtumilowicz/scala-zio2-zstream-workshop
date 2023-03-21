@@ -108,6 +108,23 @@
                 * very complex cases: good to have transformation/consumption as data types
     * `trait ZSink[-Env, +Err, -In, +Leftover, +Summary]`
         * describe ways of consuming elements
+            * composable aggregation strategy
+        * represents a strategy for aggregating zero or more elements into a summary value
+        * sink may emit zero or more leftover values of type `Chunk[+Leftover]`
+            * these represent inputs that were received by the sink but were not included in the aggregation
+            * chunking can lead to leftovers
+                * sink does not need to all of the elements in the chunk to produce a summary value
+                * example
+                    * suppose that we want to have 3 elements, but results are produced with two elements chunks
+            * can also arise even without chunking
+                * example
+                    ```
+                    ZSink.collectAllWhile(_ == "a")
+                    ```
+                    * suppose inputs like "a" then "b"
+                        * "b" is leftover because we have to consume it to decide if the sink is done
+            * why they are not simply dropped?
+                * maybe in some cases it can be useful to keep leftovers for further processing
         * how to create?
             ```
             ZSink.fromFileName("README2.md")
@@ -116,12 +133,28 @@
             ```
             def run[R1 <: R, E1 >: E, B](sink: ZSink[R1, E1, A, Any, B]): ZIO[R1, E1, B]
 
-            .run(ZSink.collectAll)
+            stream.run(ZSink.collectAll)
             ```
         * combining sinks
             ```
             outputSink1.zipPar(outputSink2) // send inputs to both
             ```
+        * asynchronous aggregations
+            * we would like to specify both a number of records we would like to aggregate and a maximum
+            duration we are willing to wait to aggregate them
+            * example
+                ```
+                def aggregateAsyncWithin[R1 <: R, E1 >: E, A1 >: A, B](
+                    sink: => ZSink[R1, E1, A1, A1, B],
+                    schedule: => Schedule[R1, Option[B], Any]
+                    )
+                ```
+                * if the sink is done first then the aggregated value will be emitted downstream
+                    * previous schedule timeout will be canceled
+                    * process will be repeated with the sink being run again and the next recurrence of the schedule
+                * if the schedule is done first then we write a done value to sink
+                    * writes its aggregated value to the downstream immediately
+                    * then run the sink again and the next recurrence of the schedule
         * mental model
             ```
             trait ZSink[-Env, +Err, -In, +Leftover, +Summary] {
@@ -140,8 +173,17 @@
                 * None = done
     * `trait ZPipeline[-Env, +Err, -In, +Out]`
         * represents the "middle" of the stream
-        * conceptually: stream transformation function
+            * streams: beginning of a data flow process
+            * sinks: end of a data flow process
+            * result of combining a pipeline with a sink is a new sink, just like the result of combining a pipeline with a stream is a new stream
+        * takes as input a stream and returns a new stream with a different element type
+            * definition of a pipeline is extremely broad
+                * almost any stream operator can be described as a pipeline
+            * can: map, filter, aggregate, append, etc
+            * can't: provide environment or handle stream errors
+        * conceptually: similar to sink - pipeline is a strategy for describing transformations, not error handling
         * most useful applications of pipelines is for encoders and decoders
+            * encoding or decoding should be completely independent of the logic of a particular stream
         * how to create?
             ```
             object ZPipeline {
@@ -152,7 +194,7 @@
             ```
             def via[R1 <: R, E1 >: E, B](pipeline: ZPipeline[R1, E1, A, B]): ZStream[R1, E1, B]
 
-            .via(ZPipeline.utf8Decode)
+            stream.via(ZPipeline.utf8Decode)
             ```
         * contramap
             * useful when we have a fixed output, and our existing function cannot consume those outputs
@@ -160,11 +202,11 @@
                 * we have some logic to process a stream already
                 * we want to apply logic to stream of different type
             * category theory
-                * Covariant Functor: map
+                * covariant Functor: map
                     * produce value A
                     * example: covariant Decoder[A]
                         * JSON => A
-                * Contravariant Functor: contramap
+                * contravariant Functor: contramap
                     * consumes value A
                     * example: JSON contravariant Encoder[A]
                         * A => JSON
@@ -188,7 +230,21 @@
             * Any = does not need / does not produce
         * `type ZSink[-R, +E, -In, +L, +Z] = ZChannel[R, Nothing, Chunk[In], Any, E, L, Z]`
             * sink itself doesn’t know how to handle any errors so the error type has to be Nothing
+                * if the stream potentially fails with an error of type `E` use `pipeToOrFail`
+                    * fails with the error of the first channel without passing it through to the second channel
+                    * example: `stream.channel.pipeToOrFail(sink.channel)`
+            * it can receive exactly one done value (`-InDone`) of type Any
+                * elements might be produced asynchronously
+                    * sink needs some way to know that there would not be more elements in the future
+            * no inputs for its error type (`-InErr`)
+                * sinks are not strategies for handling errors
+            * sink will eventually terminate, if at all
+                * with either a summary value of type `+OutElem`
+                * or an error of type `+OutErr`
         * `type ZPipeline[-R, +E, -In, +Out] = ZChannel[R, Nothing, Chunk[In], Any, E, Chunk[Out], Any]`
+            * the reason why we can hook sink with pipeline
+                * if a pipeline was just a function we would have very limited ability to compose it with other
+                streaming data types
         * `type ZIO[-R, +E, +A] = ZChannel[R, Any, Any, Any, E, Nothing, A]`
 * under the hood
     * implicit chunking
