@@ -99,6 +99,14 @@
         * pull-based
             * elements are processed by being "pulled through the stream" by the sink
         * vs ZIO: ZIO - single value (no intermediate results) and after that - will never produce another result
+            * example
+                ```
+                def publish(queue: Queue[Int]): ZIO[Any, Nothing, Any] =
+                    Random.nextInt.flatMap(queue.offer).delay(1.second).forever.fork
+                ```
+                * does work incrementally
+                * work is not reflected in the return type (contain no meaningful information)
+                    * we cannot do anything with that work, ex. transforming it or taking certain number of values
     * `trait ZSink[-Env, +Err, -In, +Leftover, +Summary]`
         * describe ways of consuming elements
         * composable aggregation strategy
@@ -220,6 +228,9 @@
                 streaming data types
             * result of combining a pipeline with a sink/stream is a new sink/stream
         * `type ZIO[-R, +E, +A] = ZChannel[R, Any, Any, Any, E, Nothing, A]`
+            * ZIO is just a special case of a channel that does not produce any incremental results
+            * shouldn't think of streams as higher level built on top of effect systems
+                * channels are fundamental and effect systems are specialized versions
 * under the hood
     * implicit chunking
         ```
