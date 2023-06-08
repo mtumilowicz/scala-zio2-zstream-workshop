@@ -114,7 +114,7 @@
                 ZSink.collectAllWhile(_ == "a")
                 ```
                 * suppose inputs: "a" then "b"
-                    * "b" is leftover because we have to consume it to decide if the sink is done
+                    * "b" is leftover because we have to consume it (execute check `_ == "a"`) to decide if the sink is done
         * how to create?
             ```
             ZSink.fromFileName("README2.md")
