@@ -12,6 +12,7 @@
     * [ZIO-streams tutorial - build a Bitcoin ticker in 10 minutes](https://www.youtube.com/watch?v=sXYceYCLUZw)
     * https://j3t.ch/tech/zio-streams-trappings/
     * https://github.com/adamgfraser/0-to-100-with-zio-test
+    * [The Streaming Future by Adam Fraser](https://www.youtube.com/watch?v=i1_-DhNaBok)
 
 ## preface
 * goals of this workshop
@@ -97,7 +98,7 @@
         * succeed with zero or more values of type O
         * pull-based
             * elements are processed by being "pulled through the stream" by the sink
-        * vs ZIO: ZIO - single value
+        * vs ZIO: ZIO - single value (no intermediate results) and after that - will never produce another result
     * `trait ZSink[-Env, +Err, -In, +Leftover, +Summary]`
         * describe ways of consuming elements
         * composable aggregation strategy
