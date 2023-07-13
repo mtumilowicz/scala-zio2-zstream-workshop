@@ -240,6 +240,11 @@
                      * similar to `flatMap` of our elements
             * shouldn't think of streams as higher level built on top of effect systems
                 * channels are fundamental and effect systems are specialized versions
+            * operations supported by ZIO are subset of operations supported by `ZChannel`
+                ```
+                private final case class FromZIO[R, E, A](zio: ZIO[R, E, A]) extends ZChannel[R, Any, Any, Any, E, Nothing, A]
+                ```
+                * runtime that can execute channels can also execute individual workflows
 * under the hood
     * implicit chunking
         ```
@@ -248,7 +253,8 @@
         }
         ```
         however, filter and map work on individual values
-   * 
+    * to run a channel you start a channel fiber: `ChannelFiber`
+        * like running a ZIO workflow: you start a ZIO fiber
 * useful operators
     * collect = map + filter
     * concat - switch to other stream after this stream is done
