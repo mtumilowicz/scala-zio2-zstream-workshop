@@ -13,6 +13,7 @@
     * https://j3t.ch/tech/zio-streams-trappings/
     * https://github.com/adamgfraser/0-to-100-with-zio-test
     * [The Streaming Future by Adam Fraser](https://www.youtube.com/watch?v=i1_-DhNaBok)
+    * [The Next Generation Of Streaming by Adam Fraser](https://www.youtube.com/watch?v=I1A6BPTjG-w)
 
 ## preface
 * goals of this workshop
@@ -228,7 +229,15 @@
                 streaming data types
             * result of combining a pipeline with a sink/stream is a new sink/stream
         * `type ZIO[-R, +E, +A] = ZChannel[R, Any, Any, Any, E, Nothing, A]`
-            * ZIO is just a special case of a channel that does not produce any incremental results
+            * ZIO is just a special case of a channel that does not read any input and does not produce any incremental results
+            * everything we know about how to run an individual ZIO workflow applies to a channel
+               * only need to handle some additional cases - only few of them
+                  * `write` - emit and increment output
+                     * similar to `ZIO.succeed` but `ZIO.succeed` means "produce this final output and be done", `write` says "produce that incremental output and then potentially keep going"
+                  * `read` - read an input element, error or done value
+                  * `PipeTo` - send one output of one channel to input of another
+                  * `ConcatMap` - generate a new channel for each element of a channel and combine them
+                     * similar to `flatMap` of our elements
             * shouldn't think of streams as higher level built on top of effect systems
                 * channels are fundamental and effect systems are specialized versions
 * under the hood
@@ -239,6 +248,7 @@
         }
         ```
         however, filter and map work on individual values
+   * 
 * useful operators
     * collect = map + filter
     * concat - switch to other stream after this stream is done
