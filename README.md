@@ -12,6 +12,7 @@
     * [ZIO-streams tutorial - build a Bitcoin ticker in 10 minutes](https://www.youtube.com/watch?v=sXYceYCLUZw)
     * https://j3t.ch/tech/zio-streams-trappings/
     * https://github.com/adamgfraser/0-to-100-with-zio-test
+    * https://www.manning.com/books/functional-programming-in-scala-second-edition
     * [The Streaming Future by Adam Fraser](https://www.youtube.com/watch?v=i1_-DhNaBok)
     * [The Next Generation Of Streaming by Adam Fraser](https://www.youtube.com/watch?v=I1A6BPTjG-w)
 
@@ -90,6 +91,30 @@
             cat ~/IdeaProjects/scala-zio2-zstream-workshop/src/test/resources/contributors/data.txt | awk -F, '{ print $1 }' | sort -u | wc -l
             ```
 ## zstream
+* why we need streaming instead of using just `IO`?
+    * `IO` type fundamentally provides us with the same level of abstraction as ordinary imperative programming
+        * writing efficient, streaming I/O will generally involve monolithic loops
+            * not composable
+    * example: program that checks whether the number of lines in a file is greater than 5
+        ```
+        def linesGt(filename: String, limit: Int): IO[Boolean] = new IO {
+          val src = io.Source.fromFile(filename)
+          try
+            var count = 0
+            val lines: Iterator[String] = src.getLines()
+            while count <= limit && lines.hasNext do
+              lines.next
+              count += 1
+            count > limit
+          finally src.close
+        }
+        ```
+        * entangles the high-level algorithm with low-level concerns about iteration and file access
+            * not easy to read
+            * barrier to composition
+            * difficult to extend later
+        * followup: find a line index before 40,000 where the first letters of consecutive lines spell out "hello"
+            * we’d need to modify our loop to keep track of some further state
 * components
     * `ZStream[R, E, O]`
         * effectual stream
